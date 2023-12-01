@@ -1,0 +1,100 @@
+%Regole AI per unire le celle
+
+%Definisco che la griglia di gioco deve essere 6 x 6
+griglia(6).
+
+%Faccio il guess per stabilire tutte le possibile combinazioni per unire due celle
+unisci(X,Y,X1,Y1) | notUnisci(X,Y,X1,Y1) :- cella(X,Y,Z), cella(X1,Y1,Z), X < X1, Z>0.
+unisci(X,Y,X1,Y1) | notUnisci(X,Y,X1,Y1) :- cella(X,Y,Z), cella(X1,Y1,Z), Y < Y1, Z>0.
+
+%Controllo tutte le possibili celle vicine ad una determinata cella
+%Controllo se c'è una cella vicina verso il basso se la cella A,B ha un valore Z, la cella sotto C,B ha un valore Z1
+%e la coordinata A della cella adiacente sotto è esattamente un unità maggiore di A
+celleVicine(A,B,C,B) :- cella(A,B,Z), cella(C,B,Z1), C=A+1, Z>0, Z1>0.
+%Controllo se c'è una cella vicina verso destra
+celleVicine(A,B,A,D) :- cella(A,B,Z), cella(A,D,Z1), D=B+1, Z>0, Z1>0.
+%Verso l'alto
+celleVicine(A,B,C,B) :- cella(A,B,Z), cella(C,B,Z1), C=A-1, Z>0, Z1>0.
+%Verso sinistra
+celleVicine(A,B,A,D) :- cella(A,B,Z), cella(A,D,Z1), D=B-1, Z>0, Z1>0.
+
+%Con queste regole verifico se c'è una cella libera in una particolare direzione all'interno della griglia di gioco
+%ad esempio, una cella può essere considerata libera verso l'alto se non ci sono altre celle sopra quella e la griglia non è al limite in quella direazione
+cellaLibera(X,Y,1):- griglia(A), cella(X,Y,Z), not celleVicine(X,Y,SU,Y), SU=X+1, SU<A, Z>0.
+cellaLibera(X,Y,2):- griglia(A), cella(X,Y,Z), not celleVicine(X,Y,X,DESTRA), DESTRA=Y+1, DESTRA<A, Z>0.
+cellaLibera(X,Y,3):- cella(X,Y,Z), not celleVicine(X,Y,X,SINISTRA), SINISTRA=Y-1, SINISTRA>=0, Z>0.
+
+%Con queste regole so dove sta avvenendo il movimento per l'unione. Se sto unendo due celle in una direzione orizzontale (destra o sinsitra), queste regole mi dicono in che direzione sta avvenendo l'unione
+%Quindi se sto unendo dalla posizione X,Y alla posizione X1,Y1 e la coordinata Y di destinazione Y1 è maggiore di quella di partenza, allora la dirazione è destra
+direzioneMovimento(X,Y,1):- unisci(X,Y,X1,Y1), Y<Y1.
+%Se sto unendo dalla posizione X,Y alla posizione X1,Y1 e la coordinata Y di destinazione Y1 è minore di quella di partenza, allora la dirazione è sinistra
+direzioneMovimento(X,Y,2):- unisci(X,Y,X1,Y1), Y1<Y.
+
+%Con queste regole identifico se un movimento di cella è possibile o meno in base a condizioni di unione e alla presenza di celle libere nelle posizioni desiderate
+%Quindi un movimento è possibile da X,Y a X1,Y1 se la cella X,Y non è occupata, la cella X1,Y1 non è occupata, sta avvenendo una unione, la direazione di movimento è destra
+%il conteggio delle celle libere nelle poszione X,Y è diverso da 3, il conteggio in X1,Y1 è diverso da 2, non c'è una barriera
+%il conteggio D delle celle libere in X,Y e il conteggio D1 in X1,Y1 sono entrambi maggiori di 0
+possoMuovere(X,Y,X1,Y1):- not cellaOccupata(X,Y), not cellaOccupata(X1,Y1), unisci(X,Y,X1,Y1), direzioneMovimento(X,Y,1), #count{X,Y,A : cellaLibera(X,Y,A), A!=3}=D, #count{X1,Y1,B : cellaLibera(X1,Y1,B), B!=2}=D1, not barriera(X,Y,X1,Y1), D>0, D1>0.
+
+%Stessa cosa ma per il movimento a sinistra
+possoMuovere(X,Y,X1,Y1):- not cellaOccupata(X,Y), not cellaOccupata(X1,Y1), unisci(X,Y,X1,Y1), direzioneMovimento(X,Y,2), #count{X,Y,A : cellaLibera(X,Y,A), A!=2}=D, #count{X1,Y1,B : cellaLibera(X1,Y1,B), B!=3}=D1, not barriera(X,Y,X1,Y1),D>0, D1>0.
+
+%mentre qui controllo se posson fare il movimenti da X,Y a X1,Y1 se la cella in X,Y ha un valore Z, X1,Y1 ha un valore Z, c'è una unione, ed entrambe le celle hanno un valore maggiore di 0
+possoMuovere(X,Y,X1,Y1):- cella(X,Y,Z), cella(X1,Y1,Z), unisci(X,Y,X1,Y1),Z>0.
+
+%Verifico se una cella specifica nella posizione X,Y della griglia è occupata, ovvero se contiene un valore diverso da zero (V>0)
+%e se non è libera in nessuna delle direzioni indicata (1,2,3)
+cellaOccupata(X,Y):- cella(X,Y,V), not cellaLibera(X,Y,1), not cellaLibera(X,Y,2), not cellaLibera(X,Y,3), V>0.
+
+%Verifico se una colonna specifica Y è totalmente occupata, ovvero se tutte le celle nella colonna hanno una valore diverso da 0
+colonnaOccupata(Y):- cella(_,Y,_), griglia(A), #count{X,Y : cella(X,Y,V), V>0}=Z, Z>=A.
+
+%Controllo se ci sono colonne occupate tra la posizione Y e Y1 o tra Y1 e Y, impedendo l'unione di due celle se una colonna nella direzione dell'unione è totalmente occuoata
+barriera(X,Y,X1,Y1):- unisci(X,Y,X1,Y1), colonnaOccupata(A), Y<Y1, A<Y1, A>Y.
+barriera(X,Y,X1,Y1):- unisci(X,Y,X1,Y1), colonnaOccupata(A), Y1<Y, A<Y, A>Y1.
+
+%Conto quante unioni posso fare mettendo il valore in K
+numeroUnioni(K):- #count{X,Y, X1, Y1: unisci(X,Y, X1, Y1)} = K.
+
+%Calcolo i massimo valore che c'è nella griglia e lo memorizzo in K
+valoreMassimoInGriglia(K) :- #max{C : cella(A,B,C)}=K.
+
+%-----------------------STRONG CONSTRAINTS------------------------
+
+%Imposto questo strong constraints per evita che ci sia una cella che ha più di un'unione possibile,
+%ovvero se si trova in una posizione in cui può unirsi con più di una cella adiacente
+%Quindi, controllo se c'è una cella nella posizione X,Y con il valore Z
+%Conto quante fusioni ci sono da x,y a x1,y1
+%Conto quante ce ne sono da x1,y1 a x,y
+%e la regola è violata se c'è più di una unione che coinvolge la cella, indipendentemente dalla direzione
+:- cella(X,Y,Z), #count{X,Y,X1,Y1 : unisci(X,Y,X1,Y1)}=A, #count{X1,Y1,X,Y : unisci(X1,Y1,X,Y)}=B, A+B>1.
+
+%Non permetto di unire le celle nelle posizioni (X,Y) e (X1,Y1) se le celle non sono vicine, se c'è una barriera tra le colonne Y e Y1 e la colonna C è occupata
+:- unisci(X,Y,X1,Y1), not celleVicine(X,Y,X1,Y1), barriera(X,Y,X1,Y1), colonnaOccupata(C), C!=Y, C!=Y1.
+
+%Non permetto di unire le celle nelle posizioni (X,Y) e (X1,Y1) se la cella in X,Y (di partenza) è già occupata e le celle non sono vicine
+:- unisci(X,Y,X1,Y1), cellaOccupata(X,Y), not celleVicine(X,Y,X1,Y1).
+
+%Non permetto di unire le celle nelle posizioni (X,Y) e (X1,Y1) se la cella in X1,Y1 (di destinazione) è già occupata e le celle non sono vicine
+:- unisci(X,Y,X1,Y1), cellaOccupata(X1,Y1), not celleVicine(X,Y,X1,Y1).
+
+%Non permetto di unire due celle se la cella di partenza non può essere spostata nella posizione di destinazione
+:- unisci(X,Y,X1,Y1), not possoMuovere(X,Y,X1,Y1).
+
+
+%---------------------------WEAK CONSTRAINTS----------------------
+
+%Se sto tentando di unire due celle, ma queste due non sono vicine allora pago
+:~ unisci(A,B,C,D), not celleVicine(A,B,C,D). [1@3, A,B,C,D]
+
+%Attribuisco un costo in base posizione dell'unione rispetto all'indice massimo possibile.
+%Se l'unione avviene in una posizione bassa, il costo sarà più alto, quindi penalizzo le unioni che potrebbero essere fatte in celle in posizioni inferiori nella griglia.
+:~ unisci(A,B,C,D), H=A+C, griglia(G), PAGA=G*2-H. [PAGA@2, A,B,C,D]
+
+%Applico una penalizzazione se il numero di unioni X non è uguale ad 1
+%Quindi il numero di unioni deve essere esattamente 1
+:~ numeroUnioni(X), X!=1. [2@3,X]
+
+%Se nella griglia ho un valore elevato, cerco di massimizzare il valore dell'unione delle celle, cercando di ottenere il massimo punteggio
+%possibile dall'unione. Penalizzo invece se il valore da unire è lontano dal massimo possibile
+:~ unisci(A,B,C,D), cella(A,B,T1), cella(C,D,T2), valoreMassimoInGriglia(MAX), VALUE=MAX*2, SOMMA= T1 + T2, TOT=VALUE-SOMMA. [TOT@1, A,B,C,D]

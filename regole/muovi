@@ -1,0 +1,96 @@
+%Regole AI per i movimenti
+
+%Stabilisco come devono essere effettuati i movimenti
+%Verifico se è possibile spostare la cella da (X,Y) a (X1,Y1), in base a se c'è un numero non nullo nella cella di partenza, la cella di destinazione vuota ecc.
+possoMuovere(X,Y,X1,Y1):- numeroUnioni(0), cella(X,Y,Z), cella(X1,Y1,0), not cellaOccupata(X,Y), not cella(SOTTO,Y1,0), SOTTO=X1-1, Z>0, Y!=Y1.
+
+%Verifico se esistono potenziali numeri che posso unire controllando le occorrenze delle celle (esempio: se ci sono due 3 nella griglia, io posso unire quei numeri e mi restituisce 3).
+numeriChePossoUnire(Z):- #count{X,Y,Z : cella(X,Y,Z)}=V , cella(A,B,Z), Z>0, V>1.
+
+%Regola per definire le condizioni che verificano se è possibile muovere una cella in una direzione specifica in modo da poter poi unire le celle.
+%Verifico se posso muovere una cella, controllo se ci sono numeri da unire, controllo se questo numero ce l'ho sotto, a sinistra o a destra e verifico se le celle adiacenti sono occupate
+possoMuovereUnire1(X,Y,X1,Y1):- possoMuovere(X,Y,X1,Y1), numeriChePossoUnire(Z), cella(SOTTO,Y,Z), cellaOccupata(SOTTO,Y), SOTTO=X-1, SOTTO>=0.
+possoMuovereUnire1(X,Y,X1,Y1):- possoMuovere(X,Y,X1,Y1), numeriChePossoUnire(Z), cella(X,SINISTRA,Z), cellaOccupata(X,SINISTRA), SINISTRA=Y-1, SINISTRA>=0.
+possoMuovereUnire1(X,Y,X1,Y1):- griglia(G),possoMuovere(X,Y,X1,Y1), numeriChePossoUnire(Z), cella(X,DESTRA,Z), cellaOccupata(X,DESTRA), DESTRA=Y+1, DESTRA<G.
+
+%Vedo se posso muovere le celle troppo in alto e controllo se ci sono celle che posso unire
+%Controllo se posso muovere una cella, se ci sono numeri da unire, che le condizioni di possoMuovereUnire1 non siano verificare
+%che la cella sotto non contenza il numero Z
+possoMuovereUnire2(X,Y,X1,Y1):- possoMuovere(X,Y,X1,Y1), numeriChePossoUnire(Z), not possoMuovereUnire1(X,Y,X1,Y1), not cella(SOTTO,Y1,Z), SOTTO=X-1.
+
+%Vedo se posso muovere le celle troppo in alto non controllando se ci sono celle che posso unire
+possoMuovereUnire3(X,Y,X1,Y1):- possoMuovere(X,Y,X1,Y1), not possoMuovereUnire2(X,Y,X1,Y1), not possoMuovereUnire1(X,Y,X1,Y1).
+
+%Verifico se una colonnaPiena impedisce lo spostamento
+%Vedo quale colonna è piena
+%Le due condizioni Y<Y1, A<Y1, A>Y e Y1<Y, A<Y, A>Y1 verificano se la colonna piena A si trova tra le colonne Y e Y1.
+%Importante perché indica che la cella che sto cercando di muovere si trova nella colonna A, e questa colonna è piena.
+barriera(X,Y,X1,Y1):- muovi(X,Y,X1,Y1), colonnaPiena(A), Y<Y1, A<Y1, A>Y.
+barriera(X,Y,X1,Y1):- muovi(X,Y,X1,Y1), colonnaPiena(A), Y1<Y, A<Y, A>Y1.
+
+%Creo tutte le possibili combinazioni per poter muovere una cella se non ho una barriera e in base ai pesi crescenti (specificati dopo nei weak constraints)
+muovi(X,Y,X1,Y1) | notMuovi(X,Y,X1,Y1):- possoMuovereUnire1(X,Y,X1,Y1), not barriera(X,Y,X1,Y1).
+muovi(X,Y,X1,Y1) | notMuovi(X,Y,X1,Y1):- possoMuovereUnire2(X,Y,X1,Y1), not barriera(X,Y,X1,Y1).
+muovi(X,Y,X1,Y1) | notMuovi(X,Y,X1,Y1):- possoMuovereUnire3(X,Y,X1,Y1), not barriera(X,Y,X1,Y1).
+
+%Controllo quale colonna ha il valore N con più occorrenze
+%verifico se nella colonna Y esiste almeno una cella con il valore N.
+%E conto il numero di occorrenze del valore N nella colonna Y e assegno il risultato a Z.
+occorrenzeNellaColonna(Y,N,Z):- numeriChePossoUnire(N), cella(_,Y,N), #count{X,Y : cella(X,Y,N)}=Z, Z>0.
+
+%Controllo se c'è una colonnaPiena che mi impedisce di fare un'unione
+%Calcolo il valore massimo di tutte le possibili unioni
+%Controllo se le colonne A e B contengono il valore N
+%verifico se la colonna di destinazione Y1 si trova tra le colonne A e B, indicando che la cella sta cercando di muoversi in una colonna che contiene il massimo valore di unione.
+vincoloUnioneColonna(X,Y,X1,Y1):- muovi(X,Y,X1,Y1), #max{Z : numeriChePossoUnire(Z)}=N, occorrenzeNellaColonna(A,N,_), occorrenzeNellaColonna(B,N,_), griglia(G), A<B, Y1>A ,Y1<B, X1=G-2.
+vincoloUnioneColonna(X,Y,X1,Y1):- muovi(X,Y,X1,Y1), #max{Z : numeriChePossoUnire(Z)}=N, occorrenzeNellaColonna(A,N,_), occorrenzeNellaColonna(B,N,_), griglia(G), B<A, Y1>B ,Y1<A, X1=G-2.
+
+%Conto quanti spostamenti posso fare mettendo il valore in K
+numeroMovimenti(K):- #count{X,Y,X1,Y1: muovi(X,Y, X1, Y1)} = K.
+
+%---------------------------WEAK CONSTRAINTS----------------------
+
+%Quando devo muovere una cella dalla posizione (A,B) alla posizione (C,D)
+%Calcolo la differenza tra la dimensione N della griglia e la posizione di partenza A.
+%Quindi Z avrà come valore la distanza dalla cella di partenza dalla fine della griglia lungo l'asse X
+%Faccio questo per preferire i movimenti delle celle più in alto nella griglia
+:~muovi(A,B,C,D), griglia(N), Z=N-A. [Z@3, A,B,C,D]
+
+%Penalizzo il movimento delle celle in cui la cella sottostante contiene un numero diverso dal massimo tra tutti i numeri che possono essere uniti.
+%Quindi preferisco muovere le celle in modo che il numero nella cella sottostante sia il massimo tra tutti i numeri che possono essere uniti
+:~muovi(A,B,C,D), numeriChePossoUnire(Z), cella(SOTTO,Y,Z), SOTTO=X-1, #max{Z : numeriChePossoUnire(Z)}=N, Z!=N. [1@1, A,B,C,D]
+
+%Applico una penalizzazione se il numero di movimenti X non è uguale ad 1
+%Quindi il numero di movimenti deve essere esattamente 1
+:~ numeroMovimenti(X), X!=1. [2@4,X]
+
+%Nel caso in cui ci fosse uno spostamento da A,B a C,D, faccio la somma della dimensione della griglia N e la cordinata X di destinazione C
+%E pago se la cella vuota si trova ad un livello superiore, quindi preferisco muovere la cella verso sinistra o verso coordinate X più basse
+:~ muovi(A,B,C,D), griglia(N), DIMENSIONE=N+C. [DIMENSIONE@2, A,B,C,D]
+
+%Gestisco il movimento delle celle quando ci sono numeri che possono essere uniti nelle vicinanze
+%quindi indirizzo il movimento delle celle in modo da favovire l'unione di numeri quando possibile
+%In parole povere, evito di spostare le celle nelle celle che potrebbero permettere di fare delle unioni
+:~ muovi(A,B,C,D), numeriChePossoUnire(N), cella(SOTTO,D,N), SOTTO=C-1. [2@3, A,B,C,D]
+:~ muovi(A,B,C,D), numeriChePossoUnire(N), cella(C,SINISTRA,N), SINISTRA=D-1, not cella(A,DESTRA,N), DESTRA=B+1. [2@3, A,B,C,D]
+:~ muovi(A,B,C,D), numeriChePossoUnire(N), cella(C,DESTRA,N), DESTRA=D+1, not cella(A,SINISTRA,N), SINISTRA=B-1. [2@3, A,B,C,D]
+
+%Conto quante occorrenze di numeri che possono essere uniti ci sono nella colonna di destinazione D
+%E cerco di evitare evitare i movimenti verso colonne con molte occorrenze
+:~ muovi(A,B,C,D), occorrenzeNellaColonna(D,_,Z), #max{O : occorrenzeNellaColonna(_,_,O)}=Z. [1@2, A,B,C,D]
+
+%In questo cado do un peso crescente ad ogni regola per muovermi ed unire due celle
+%Assumendo che la prima regola sia quella preferita
+:~ muovi(A,B,C,D), possoMuovereUnire2(A,B,C,D). [5@3, A,B,C,D]
+:~ muovi(A,B,C,D), possoMuovereUnire3(A,B,C,D). [10@3, A,B,C,D]
+
+%In questa regola panelizzo i casi un cui muovendo una cella potrei avere l'unione di due celle ma c'è una colonna che impedisce ciò
+%Ovvero, cerco di evitare che un movimenti porti ad un'unione quando la collona di destinazione è piena
+%E quindi non rispetterei la regola possoMuovereUnire1
+:~ muovi(A,B,C,D), vincoloUnioneColonna(A,B,C,D). [1@1, A,B,C,D]
+
+%Considerando un movimento da A,B a C,D indico che il movimento può essere eseguito solo se non c'è la possibilità
+%di unire numeri nelle vicinanze durante il movimento. Specifico che la possa deve essere verso il basso della griglia
+%Quindi in tutto ciò, penalizzo i movimenti verso il basso quando non c'è possibilità di unire numero nella vicinanze
+%Favorendo i movimento che possono portare ad unioni di celle
+:~ muovi(A,B,C,D), possoMuovereUnire3(A,B,C,D), C>=A. [3@4, A,B,C,D]
